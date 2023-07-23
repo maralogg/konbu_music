@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>bgm player</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<style>
+body {
+font-family: Arial, sans-serif;
+background-color: #f9f9f9;
+margin: 0;
+padding: 0;
+}
+
+header {
+background-color: #333; 
+color: #fff; 
+padding: 10px 0; 
+text-align: center; 
+}
+
+#player {
+width: auto;
+height: auto;
+background-color: #333;
+margin: 10px auto; 
+border-radius: 20px; 
+overflow: hidden; 
+}
+
+
+.player-container {
+width: 34.2%;
+margin: 0 auto;
+text-align: center;
+}
+
+h1 {
+text-align: center;
+margin: 20px 0;
+}
+
+.container {
+max-width: auto;
+
+width: auto;
+margin: 0px auto;
+padding: 0px;
+background-color: #fff; 
+box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* コンテンツに影を付ける */
+border-radius: 10px; /* コンテンツの角を丸める */
+text-align: center; /* 表を中央に配置 */
+display: flex; /* 表を中央に配置 */
+flex-direction: column; /* 表を中央に配置 */
+}
+
+.video-form {
+display: flex;
+align-items: center;
+justify-content: center;
+margin-bottom: 20px;
+}
+
+.video-form input[type="text"] {
+width: 300px;
+padding: 8px;
+font-size: 16px;
+border: 1px solid #ccc;
+border-radius: 4px;
+}
+
+.video-form button {
+padding: 8px 16px;
+font-size: 16px;
+background-color: #007bff;
+color: #fff;
+border: none;
+cursor: pointer;
+margin-left: 10px;
+border-radius: 4px;
+}
+
+/*表の中*/
+table {
+border-collapse: collapse;
+width: 100%; /* テーブルを100%に設定 */
+color:#333;
+background-color: #fff;
+}
+
+th, td {
+border: 1px solid #ccc;
+padding: 10px;
+text-align: center;
+}
+
+th {
+color:#fff;
+background-color: #555;
+}
+
+.test-icon {
+font-size: 24px;
+color: #007bff;
+}
+
+.test-icon.empty {
+color: #ccc;
+}
+
+.delete-button {
+padding: 6px 12px;
+background-color: #dc3545;
+color: #333;
+border: none;
+cursor: pointer;
+border-radius: 4px;
+}
+
+</style>
+</head>
+<body>
+<header>
+<h3>konbu music</h3>
+</header>
+
+<div class="player-container">
+<div id="player"></div>
+</div>
+
+<div class="container">
+<div class="video-form">
+<input type="text" id="videoLink" placeholder="YouTubeのリンクを入力してください">
+<button onclick="addVideo()">動画を追加</button>
+</div>
+
+<table id="videoTable">
+<thead>
+<tr>
+<th>#</th>
+<th>URL</th>
+<th>タイトル</th>
+<th>再生済</th>
+<th>削除</th>
+</tr>
+</thead>
+<tbody id="videoTableBody"></tbody>
+</table>
+</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script src="youtube-api.js"></script>
+<script>
+var player;
+var videoQueue = []; // 動画再生リスト
+var isPlayerReady = false; // プレーヤーの準備ができているかを示すフラグ
+var isPlayerPlaying = false; // プレーヤーが再生中かを示すフラグ
+var linkCounter = 0; // リンクの番号を示すカウンター
+var videoData = {}; // 動画の情報を格納するオブジェクト
+
+// YouTube Player APIの読み込みが完了したときに呼ばれるコールバック関数
+function onYouTubeIframeAPIReady() {
+player = new YT.Player('player', {
+height: '100%',
+width: '100%',
+playerVars: {
+autoplay: 1,
+controls: 1,
+rel: 0,
+modestbranding: 1,
+showinfo: 0,
+fs: 1,
+},
+events: {
+'onReady': onPlayerReady,
+'onStateChange': onPlayerStateChange
+}
+});
+}
+
+// プレーヤーの準備ができたときに呼ばれる関数
+function onPlayerReady() {
+isPlayerReady = true;
+}
+
+// 動画を追加する関数
+function addVideo() {
+var videoLink = document.getElementById('videoLink').value;
+var videoId = extractVideoId(videoLink);
+if (videoId) {
+// リンクの番号を更新
+linkCounter++;
+
+// 入力したリンクを表に追加
+var videoTableBody = document.getElementById('videoTableBody');
+var row = document.createElement('tr');
+var cell1 = document.createElement('td');
+var cell2 = document.createElement('td');
+var deleteButton = document.createElement('button');
+var testCell = document.createElement('td'); // 追加した"test"のセル
+var testIcon = document.createElement('span'); // テストアイコン(○)の要素
+testIcon.textContent = ""; // 初期状態ではテストアイコンを非表示
+deleteButton.textContent = '削除';
+deleteButton.onclick = function() {
+removeVideo(row, videoId);
+};
+cell1.textContent = linkCounter;
+cell2.textContent = videoLink;
+testCell.appendChild(testIcon); // テストアイコンを"test"のセルに追加
+row.appendChild(cell1);
+row.appendChild(cell2);
+row.appendChild(testCell); // テストセルを行に追加
+row.appendChild(deleteButton);
+videoTableBody.appendChild(row);
+
+// YouTube APIを使用して動画のタイトルを取得し、表に追加
+getVideoTitle(videoId).then(function(title) {
+var titleCell = document.createElement('td');
+titleCell.textContent = title;
+row.insertBefore(titleCell, testCell); // テストセルの前にタイトルセルを追加
+});
+
+// 動画を再生リストに追加
+videoQueue.push(videoId);
+
+// プレーヤーの準備ができていない場合は、即座に再生を開始する
+if (isPlayerReady && !isPlayerPlaying) {
+playNextVideo();
+}
+
+// 入力欄を空にする
+document.getElementById('videoLink').value = '';
+}
+}
+
+// 動画を削除する関数
+function removeVideo(row, videoId) {
+var index = videoQueue.indexOf(videoId);
+if (index !== -1) {
+videoQueue.splice(index, 1);
+row.remove();
+// リンクを削除した分の番号を再計算して振り直す
+linkCounter = 0;
+var videoTableBody = document.getElementById('videoTableBody');
+for (var i = 0; i < videoTableBody.rows.length; i++) {
+videoTableBody.rows[i].cells[0].textContent = ++linkCounter;
+}
+}
+}
+
+// YouTube動画のIDを抽出する関数（以前のコードと同じ）
+function extractVideoId(url) {
+var regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\??v?=?))([^#\&\?]*).*/;
+var match = url.match(regExp);
+return (match && match[7].length === 11) ? match[7] : false;
+}
+
+// YouTube APIを使用して動画のタイトルを取得する関数
+function getVideoTitle(videoId) {
+return new Promise(function(resolve, reject) {
+if (videoData[videoId]) {
+// キャッシュ済みの動画情報がある場合は再取得しない
+resolve(videoData[videoId].title);
+} else {
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'https://www.googleapis.com/youtube/v3/videos?part=snippet&id=' + videoId + '&key=AIzaSyAAaCFw-s3nf8MPhUUWSS5e5mL8G1Uxa7w');
+xhr.onload = function() {
+if (xhr.status === 200) {
+var response = JSON.parse(xhr.responseText);
+var title = response.items[0].snippet.title;
+// 動画情報をキャッシュ
+videoData[videoId] = { title: title };
+resolve(title);
+} else {
+reject(xhr.statusText);
+}
+};
+xhr.onerror = function() {
+reject('Network error');
+};
+xhr.send();
+}
+});
+}
+
+// プレーヤーの状態が変わったときに呼ばれる関数
+function onPlayerStateChange(event) {
+if (event.data === YT.PlayerState.PLAYING) {
+isPlayerPlaying = true;
+} else if (event.data === YT.PlayerState.ENDED) {
+isPlayerPlaying = false;
+setTestIcons(); // 動画再生が終わったら再度テストアイコンを表示
+playNextVideo(); // 次の動画を再生
+} else {
+isPlayerPlaying = false;
+}
+}
+
+// 次の動画を再生する関数
+function playNextVideo() {
+if (videoQueue.length > 0) {
+var nextVideoId = videoQueue.shift();
+player.loadVideoById(nextVideoId);
+}
+}
+
+// 動画再生が終わった後、テストアイコン(○)を表示する関数
+function setTestIcons() {
+var videoTableBody = document.getElementById('videoTableBody');
+for (var i = 0; i < videoTableBody.rows.length; i++) {
+var videoId = extractVideoId(videoTableBody.rows[i].cells[1].textContent);
+var testCell = videoTableBody.rows[i].cells[3]; // "test"のセル
+
+
+if (videoQueue.indexOf(videoId) === -1) {
+// 動画再生リストにない場合、○を表示
+testCell.textContent = "✔️";
+} else {
+// 動画再生リストにある場合、テストアイコンを空にする
+
+
+if (videoQueue.indexOf(videoId) === 0) {
+// 動画再生リストにない場合、○を表示
+testCell.textContent = "再生中";
+} else {
+testCell.textContent = "";
+}
+}
+}
+}
+</script>
+</body>
+</html>
